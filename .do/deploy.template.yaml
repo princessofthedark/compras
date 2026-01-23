@@ -1,0 +1,36 @@
+# Template para deployment en Digital Ocean
+# Copiar este archivo y completar con tus valores
+
+spec:
+  name: autodis-compras
+  region: nyc
+
+  databases:
+    - engine: PG
+      name: db
+      num_nodes: 1
+      size: db-s-1vcpu-1gb
+      version: "15"
+
+  envs:
+    # IMPORTANTE: Genera una nueva SECRET_KEY
+    # python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+    - key: SECRET_KEY
+      value: "TU-SECRET-KEY-AQUI"
+      type: SECRET
+
+    # Redis: Crear Redis managed database en DO y copiar URL
+    - key: REDIS_URL
+      value: "rediss://default:PASSWORD@HOST:25061"
+      type: SECRET
+
+    # Email: Configurar con tu proveedor
+    - key: EMAIL_HOST
+      value: "smtp.gmail.com"
+
+    - key: EMAIL_HOST_USER
+      value: "compras@autodis.mx"
+
+    - key: EMAIL_HOST_PASSWORD
+      value: "TU-PASSWORD-EMAIL"
+      type: SECRET

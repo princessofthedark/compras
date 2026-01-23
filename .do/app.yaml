@@ -1,0 +1,228 @@
+# Digital Ocean App Platform Configuration
+# AUTODIS Sistema de Compras
+
+name: autodis-compras
+
+# Base de datos PostgreSQL
+databases:
+  - name: db
+    engine: PG
+    version: "15"
+    production: true
+    cluster_name: autodis-compras-db
+
+# Componentes de la aplicación
+services:
+  # Django Web Service
+  - name: web
+    github:
+      repo: princessofthedark/compras
+      branch: claude/read-pdf-build-yznqI
+      deploy_on_push: true
+
+    build_command: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+
+    run_command: |
+      python manage.py migrate --noinput
+      gunicorn autodis_compras.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    http_port: 8000
+
+    health_check:
+      http_path: /admin/login/
+
+    envs:
+      - key: DJANGO_SETTINGS_MODULE
+        value: autodis_compras.settings.production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: SECRET_KEY
+        type: SECRET
+        value: ${SECRET_KEY}
+
+      - key: ALLOWED_HOSTS
+        value: ${APP_DOMAIN},.ondigitalocean.app,compras.autodis.mx
+
+      # Database (auto-inyectado por Digital Ocean)
+      - key: DB_NAME
+        scope: RUN_TIME
+        value: ${db.DATABASE}
+
+      - key: DB_USER
+        scope: RUN_TIME
+        value: ${db.USERNAME}
+
+      - key: DB_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: ${db.PASSWORD}
+
+      - key: DB_HOST
+        scope: RUN_TIME
+        value: ${db.HOSTNAME}
+
+      - key: DB_PORT
+        scope: RUN_TIME
+        value: ${db.PORT}
+
+      # Redis
+      - key: REDIS_URL
+        type: SECRET
+        value: ${REDIS_URL}
+
+      # Email
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+
+      - key: EMAIL_HOST
+        value: ${EMAIL_HOST}
+
+      - key: EMAIL_PORT
+        value: "587"
+
+      - key: EMAIL_USE_TLS
+        value: "True"
+
+      - key: EMAIL_HOST_USER
+        value: ${EMAIL_HOST_USER}
+
+      - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: ${EMAIL_HOST_PASSWORD}
+
+      - key: DEFAULT_FROM_EMAIL
+        value: compras@autodis.mx
+
+  # Celery Worker
+  - name: worker
+    github:
+      repo: princessofthedark/compras
+      branch: claude/read-pdf-build-yznqI
+      deploy_on_push: true
+
+    build_command: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    run_command: celery -A autodis_compras worker -l info --concurrency=2
+
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    envs:
+      - key: DJANGO_SETTINGS_MODULE
+        value: autodis_compras.settings.production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: SECRET_KEY
+        type: SECRET
+        value: ${SECRET_KEY}
+
+      - key: DB_NAME
+        scope: RUN_TIME
+        value: ${db.DATABASE}
+
+      - key: DB_USER
+        scope: RUN_TIME
+        value: ${db.USERNAME}
+
+      - key: DB_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: ${db.PASSWORD}
+
+      - key: DB_HOST
+        scope: RUN_TIME
+        value: ${db.HOSTNAME}
+
+      - key: DB_PORT
+        scope: RUN_TIME
+        value: ${db.PORT}
+
+      - key: REDIS_URL
+        type: SECRET
+        value: ${REDIS_URL}
+
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+
+      - key: EMAIL_HOST
+        value: ${EMAIL_HOST}
+
+      - key: EMAIL_PORT
+        value: "587"
+
+      - key: EMAIL_USE_TLS
+        value: "True"
+
+      - key: EMAIL_HOST_USER
+        value: ${EMAIL_HOST_USER}
+
+      - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: ${EMAIL_HOST_PASSWORD}
+
+  # Celery Beat (Tareas Programadas)
+  - name: beat
+    github:
+      repo: princessofthedark/compras
+      branch: claude/read-pdf-build-yznqI
+      deploy_on_push: true
+
+    build_command: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    run_command: celery -A autodis_compras beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    envs:
+      - key: DJANGO_SETTINGS_MODULE
+        value: autodis_compras.settings.production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: SECRET_KEY
+        type: SECRET
+        value: ${SECRET_KEY}
+
+      - key: DB_NAME
+        scope: RUN_TIME
+        value: ${db.DATABASE}
+
+      - key: DB_USER
+        scope: RUN_TIME
+        value: ${db.USERNAME}
+
+      - key: DB_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: ${db.PASSWORD}
+
+      - key: DB_HOST
+        scope: RUN_TIME
+        value: ${db.HOSTNAME}
+
+      - key: DB_PORT
+        scope: RUN_TIME
+        value: ${db.PORT}
+
+      - key: REDIS_URL
+        type: SECRET
+        value: ${REDIS_URL}
