@@ -5,9 +5,19 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Authentication (JWT)
+    path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # API endpoints
     path('api/users/', include('autodis_compras.apps.users.urls')),
     path('api/requests/', include('autodis_compras.apps.requests.urls')),
     path('api/budgets/', include('autodis_compras.apps.budgets.urls')),
