@@ -12,6 +12,8 @@ from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers as ser
 
 from autodis_compras.apps.requests.models import PurchaseRequest
 from autodis_compras.apps.budgets.models import Budget
@@ -46,6 +48,10 @@ class ExpensesByPeriodView(APIView):
     """Reporte de gastos por periodo (mes/trimestre/anio)."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(tags=['Reportes'], responses=inline_serializer('ExpensesByPeriodResponse', fields={
+        'filters': ser.DictField(), 'totals': ser.DictField(),
+        'by_category': ser.ListField(), 'by_cost_center': ser.ListField(),
+    }))
     def get(self, request):
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -167,6 +173,9 @@ class BudgetComparisonView(APIView):
     """Reporte de comparacion presupuesto vs gasto real."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(tags=['Reportes'], responses=inline_serializer('BudgetComparisonResponse', fields={
+        'filters': ser.DictField(), 'results': ser.ListField(),
+    }))
     def get(self, request):
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -286,6 +295,9 @@ class ExpensesByEmployeeView(APIView):
     """Reporte de gastos por empleado."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(tags=['Reportes'], responses=inline_serializer('ExpensesByEmployeeResponse', fields={
+        'filters': ser.DictField(), 'results': ser.ListField(),
+    }))
     def get(self, request):
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -344,6 +356,9 @@ class TopSuppliersView(APIView):
     """Reporte de proveedores mas utilizados."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(tags=['Reportes'], responses=inline_serializer('TopSuppliersResponse', fields={
+        'filters': ser.DictField(), 'results': ser.ListField(),
+    }))
     def get(self, request):
         year = request.query_params.get('year')
         export = request.query_params.get('export')
@@ -391,6 +406,13 @@ class DashboardSummaryView(APIView):
     """Resumen general para el dashboard."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(tags=['Reportes'], responses=inline_serializer('DashboardSummaryResponse', fields={
+        'pending_manager_approval': ser.IntegerField(),
+        'pending_finance_approval': ser.IntegerField(),
+        'in_process': ser.IntegerField(),
+        'completed_this_month': ser.IntegerField(),
+        'monthly_spend': ser.DecimalField(max_digits=12, decimal_places=2),
+    }))
     def get(self, request):
         user = request.user
         now = timezone.now()

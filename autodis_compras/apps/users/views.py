@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import Area, Location, CostCenter, User
 from .serializers import (
@@ -31,6 +32,9 @@ class IsManagerOrAbove(permissions.BasePermission):
         return request.user.can_manage_users()
 
 
+@extend_schema_view(list=extend_schema(tags=['Áreas']), retrieve=extend_schema(tags=['Áreas']),
+                     create=extend_schema(tags=['Áreas']), update=extend_schema(tags=['Áreas']),
+                     partial_update=extend_schema(tags=['Áreas']), destroy=extend_schema(tags=['Áreas']))
 class AreaViewSet(viewsets.ModelViewSet):
     queryset = Area.objects.all()
     serializer_class = AreaSerializer
@@ -40,6 +44,9 @@ class AreaViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description']
 
 
+@extend_schema_view(list=extend_schema(tags=['Ubicaciones']), retrieve=extend_schema(tags=['Ubicaciones']),
+                     create=extend_schema(tags=['Ubicaciones']), update=extend_schema(tags=['Ubicaciones']),
+                     partial_update=extend_schema(tags=['Ubicaciones']), destroy=extend_schema(tags=['Ubicaciones']))
 class LocationViewSet(viewsets.ModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
@@ -49,6 +56,9 @@ class LocationViewSet(viewsets.ModelViewSet):
     search_fields = ['name']
 
 
+@extend_schema_view(list=extend_schema(tags=['Centros de Costos']), retrieve=extend_schema(tags=['Centros de Costos']),
+                     create=extend_schema(tags=['Centros de Costos']), update=extend_schema(tags=['Centros de Costos']),
+                     partial_update=extend_schema(tags=['Centros de Costos']), destroy=extend_schema(tags=['Centros de Costos']))
 class CostCenterViewSet(viewsets.ModelViewSet):
     queryset = CostCenter.objects.select_related('area', 'location').all()
     serializer_class = CostCenterSerializer
@@ -59,6 +69,10 @@ class CostCenterViewSet(viewsets.ModelViewSet):
     ordering_fields = ['code', 'name']
 
 
+@extend_schema_view(list=extend_schema(tags=['Usuarios']), retrieve=extend_schema(tags=['Usuarios']),
+                     create=extend_schema(tags=['Usuarios']), update=extend_schema(tags=['Usuarios']),
+                     partial_update=extend_schema(tags=['Usuarios']), destroy=extend_schema(tags=['Usuarios']),
+                     me=extend_schema(tags=['Usuarios']))
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.select_related('area', 'location', 'cost_center').all()
     permission_classes = [permissions.IsAuthenticated, IsManagerOrAbove]

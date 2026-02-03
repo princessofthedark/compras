@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import Category, Item, Budget, BudgetHistory
 from .serializers import (
@@ -26,6 +27,9 @@ class IsFinanceOrDirector(permissions.BasePermission):
         return request.user.can_manage_budgets()
 
 
+@extend_schema_view(list=extend_schema(tags=['Categorías']), retrieve=extend_schema(tags=['Categorías']),
+                     create=extend_schema(tags=['Categorías']), update=extend_schema(tags=['Categorías']),
+                     partial_update=extend_schema(tags=['Categorías']), destroy=extend_schema(tags=['Categorías']))
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -35,6 +39,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
     search_fields = ['code', 'name']
 
 
+@extend_schema_view(list=extend_schema(tags=['Items']), retrieve=extend_schema(tags=['Items']),
+                     create=extend_schema(tags=['Items']), update=extend_schema(tags=['Items']),
+                     partial_update=extend_schema(tags=['Items']), destroy=extend_schema(tags=['Items']))
 class ItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.select_related('category').all()
     serializer_class = ItemSerializer
@@ -45,6 +52,15 @@ class ItemViewSet(viewsets.ModelViewSet):
     ordering_fields = ['code', 'name', 'category']
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['Presupuestos']), retrieve=extend_schema(tags=['Presupuestos']),
+    create=extend_schema(tags=['Presupuestos']), update=extend_schema(tags=['Presupuestos']),
+    partial_update=extend_schema(tags=['Presupuestos']), destroy=extend_schema(tags=['Presupuestos']),
+    summary=extend_schema(tags=['Presupuestos']), copy_month=extend_schema(tags=['Presupuestos']),
+    project_from_previous_year=extend_schema(tags=['Presupuestos']),
+    close_month=extend_schema(tags=['Presupuestos']), reopen_month=extend_schema(tags=['Presupuestos']),
+    import_excel=extend_schema(tags=['Presupuestos']),
+)
 class BudgetViewSet(viewsets.ModelViewSet):
     queryset = Budget.objects.select_related('cost_center', 'category').all()
     serializer_class = BudgetSerializer
@@ -304,6 +320,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
         })
 
 
+@extend_schema_view(list=extend_schema(tags=['Historial Presupuestos']),
+                     retrieve=extend_schema(tags=['Historial Presupuestos']))
 class BudgetHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = BudgetHistory.objects.select_related('budget', 'changed_by').all()
     serializer_class = BudgetHistorySerializer
