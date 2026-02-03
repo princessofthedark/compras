@@ -8,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import PurchaseRequest, RequestComment, RequestAttachment, RequestStatusHistory
 from .serializers import (
@@ -20,6 +21,15 @@ from .serializers import (
 )
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['Solicitudes']), retrieve=extend_schema(tags=['Solicitudes']),
+    create=extend_schema(tags=['Solicitudes']), update=extend_schema(tags=['Solicitudes']),
+    partial_update=extend_schema(tags=['Solicitudes']), destroy=extend_schema(tags=['Solicitudes']),
+    submit=extend_schema(tags=['Solicitudes']), approve_manager=extend_schema(tags=['Solicitudes']),
+    approve_final=extend_schema(tags=['Solicitudes']), reject=extend_schema(tags=['Solicitudes']),
+    cancel=extend_schema(tags=['Solicitudes']), mark_in_process=extend_schema(tags=['Solicitudes']),
+    mark_purchased=extend_schema(tags=['Solicitudes']), mark_completed=extend_schema(tags=['Solicitudes']),
+)
 class PurchaseRequestViewSet(viewsets.ModelViewSet):
     queryset = PurchaseRequest.objects.select_related(
         'requester', 'cost_center', 'category',
@@ -245,6 +255,9 @@ class PurchaseRequestViewSet(viewsets.ModelViewSet):
         return Response(PurchaseRequestDetailSerializer(purchase_request).data)
 
 
+@extend_schema_view(list=extend_schema(tags=['Comentarios']), retrieve=extend_schema(tags=['Comentarios']),
+                     create=extend_schema(tags=['Comentarios']), update=extend_schema(tags=['Comentarios']),
+                     partial_update=extend_schema(tags=['Comentarios']), destroy=extend_schema(tags=['Comentarios']))
 class RequestCommentViewSet(viewsets.ModelViewSet):
     queryset = RequestComment.objects.select_related('user').all()
     serializer_class = RequestCommentSerializer
@@ -257,6 +270,8 @@ class RequestCommentViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+@extend_schema_view(list=extend_schema(tags=['Adjuntos']), retrieve=extend_schema(tags=['Adjuntos']),
+                     create=extend_schema(tags=['Adjuntos']), destroy=extend_schema(tags=['Adjuntos']))
 class RequestAttachmentViewSet(viewsets.ModelViewSet):
     queryset = RequestAttachment.objects.select_related('uploaded_by').all()
     serializer_class = RequestAttachmentSerializer

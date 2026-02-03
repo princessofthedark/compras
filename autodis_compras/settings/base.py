@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_celery_beat',
     'django_celery_results',
+    'drf_spectacular',
 
     # Local apps
     'autodis_compras.apps.users',
@@ -123,6 +124,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -135,6 +137,55 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# drf-spectacular (OpenAPI / Swagger)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'AUTODIS - Sistema de Compras API',
+    'DESCRIPTION': (
+        'API REST para el Sistema de Compras y Gestión de Presupuestos de AUTODIS.\n\n'
+        '## Módulos\n'
+        '- **Usuarios**: Gestión de usuarios, áreas, ubicaciones y centros de costos\n'
+        '- **Solicitudes**: Flujo completo de solicitudes de compra con 10 estados\n'
+        '- **Presupuestos**: Control presupuestal por centro de costos, categoría y mes\n'
+        '- **Reportes**: Reportes con exportación a Excel y PDF\n'
+        '- **Notificaciones**: Notificaciones por correo electrónico\n\n'
+        '## Autenticación\n'
+        'Usar JWT Bearer token. Obtener token en `/api/auth/login/` con email y password.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'ENUM_NAME_OVERRIDES': {
+        'RequestStatusEnum': 'autodis_compras.apps.requests.models.PurchaseRequest.STATUS_CHOICES',
+    },
+    'TAGS': [
+        {'name': 'Auth', 'description': 'Autenticación JWT'},
+        {'name': 'Usuarios', 'description': 'Gestión de usuarios del sistema'},
+        {'name': 'Áreas', 'description': 'Áreas operativas de AUTODIS'},
+        {'name': 'Ubicaciones', 'description': 'Ubicaciones geográficas'},
+        {'name': 'Centros de Costos', 'description': 'Centros de costos para control presupuestal'},
+        {'name': 'Solicitudes', 'description': 'Solicitudes de compra y flujo de aprobación'},
+        {'name': 'Comentarios', 'description': 'Comentarios en solicitudes'},
+        {'name': 'Adjuntos', 'description': 'Archivos adjuntos a solicitudes'},
+        {'name': 'Categorías', 'description': 'Categorías presupuestales'},
+        {'name': 'Items', 'description': 'Items del catálogo de compras'},
+        {'name': 'Presupuestos', 'description': 'Presupuestos mensuales por centro de costos'},
+        {'name': 'Historial Presupuestos', 'description': 'Historial de cambios en presupuestos'},
+        {'name': 'Reportes', 'description': 'Reportes y exportación Excel/PDF'},
+    ],
+}
+
+# JWT Configuration
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
 # Email Configuration
