@@ -4,13 +4,22 @@ Comando para poblar datos iniciales del sistema AUTODIS.
 según el PDF de especificaciones.
 """
 
+from decimal import Decimal
 from django.core.management.base import BaseCommand
-from autodis_compras.apps.users.models import Area, Location, CostCenter
-from autodis_compras.apps.budgets.models import Category, Item
+from django.utils import timezone
+from autodis_compras.apps.users.models import Area, Location, CostCenter, User
+from autodis_compras.apps.budgets.models import Category, Item, Budget
 
 
 class Command(BaseCommand):
     help = 'Poblar datos iniciales (Áreas, Ubicaciones, Centros de Costos, Categorías e Items)'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--with-demo',
+            action='store_true',
+            help='Crear usuarios demo y presupuestos de ejemplo',
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Iniciando poblacion de datos iniciales...'))
@@ -117,11 +126,16 @@ class Command(BaseCommand):
         self.stdout.write('\nCreando Items (228 en total)...')
         self._create_items()
 
+        if options.get('with_demo'):
+            self._create_demo_users()
+            self._create_demo_budgets()
+
         self.stdout.write('\n' + self.style.SUCCESS('Poblacion de datos iniciales completada!'))
-        self.stdout.write(self.style.WARNING('\nProximos pasos:'))
-        self.stdout.write('  1. Crear un superusuario: python manage.py createsuperuser')
-        self.stdout.write('  2. Crear usuarios del sistema con sus roles')
-        self.stdout.write('  3. Cargar presupuestos iniciales')
+        if not options.get('with_demo'):
+            self.stdout.write(self.style.WARNING('\nProximos pasos:'))
+            self.stdout.write('  1. Crear un superusuario: python manage.py createsuperuser')
+            self.stdout.write('  2. Crear usuarios del sistema: python manage.py populate_initial_data --with-demo')
+            self.stdout.write('  3. O crear usuarios manualmente en /admin/')
 
     def _create_items(self):
         """Crea los 228 items distribuidos en las 12 categorias."""
@@ -433,4 +447,125 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'\n  Total items creados: {total_created} | Ya existentes: {total_existing} | '
             f'Gran total: {total_created + total_existing}'
+        ))
+
+    def _create_demo_users(self):
+        """Crea usuarios demo para cada rol."""
+        self.stdout.write('\nCreando usuarios demo...')
+
+        demo_users = [
+            {
+                'email': 'empleado@autodis.mx', 'username': 'empleado',
+                'first_name': 'Juan', 'last_name': 'Lopez',
+                'role': User.EMPLEADO, 'area': Area.OPERACIONES,
+                'location': Location.GUADALAJARA, 'cost_center': 'OPERACIONES-GDL',
+            },
+            {
+                'email': 'empleado2@autodis.mx', 'username': 'empleado2',
+                'first_name': 'Maria', 'last_name': 'Garcia',
+                'role': User.EMPLEADO, 'area': Area.COMERCIAL,
+                'location': Location.OFICINAS_CENTRALES, 'cost_center': 'COMERCIAL-VENTAS-NORTE',
+            },
+            {
+                'email': 'gerente@autodis.mx', 'username': 'gerente',
+                'first_name': 'Carlos', 'last_name': 'Ramirez',
+                'role': User.GERENTE, 'area': Area.OPERACIONES,
+                'location': Location.GUADALAJARA, 'cost_center': 'OPERACIONES-GDL',
+            },
+            {
+                'email': 'gerente2@autodis.mx', 'username': 'gerente2',
+                'first_name': 'Ana', 'last_name': 'Martinez',
+                'role': User.GERENTE, 'area': Area.COMERCIAL,
+                'location': Location.OFICINAS_CENTRALES, 'cost_center': 'COMERCIAL-VENTAS-NORTE',
+            },
+            {
+                'email': 'finanzas@autodis.mx', 'username': 'finanzas',
+                'first_name': 'Pedro', 'last_name': 'Hernandez',
+                'role': User.FINANZAS, 'area': Area.FINANZAS,
+                'location': Location.OFICINAS_CENTRALES, 'cost_center': 'FINANZAS',
+            },
+            {
+                'email': 'director@autodis.mx', 'username': 'director',
+                'first_name': 'Roberto', 'last_name': 'Sanchez',
+                'role': User.DIRECCION_GENERAL, 'area': Area.ADMINISTRACION,
+                'location': Location.OFICINAS_CENTRALES, 'cost_center': 'DIRECCION-GENERAL',
+            },
+        ]
+
+        for u in demo_users:
+            if User.objects.filter(email=u['email']).exists():
+                self.stdout.write(f'  - Usuario ya existe: {u["email"]}')
+                continue
+
+            area = Area.objects.get(name=u['area'])
+            location = Location.objects.get(name=u['location'])
+            cost_center = CostCenter.objects.get(code=u['cost_center'])
+
+            user = User.objects.create_user(
+                username=u['username'], email=u['email'],
+                password='Demo2026!',
+                first_name=u['first_name'], last_name=u['last_name'],
+                role=u['role'], area=area, location=location,
+                cost_center=cost_center,
+            )
+            self.stdout.write(self.style.SUCCESS(
+                f'  + {user.get_role_display()}: {u["email"]} (password: Demo2026!)'
+            ))
+
+        # Crear superusuario admin
+        if not User.objects.filter(email='admin@autodis.mx').exists():
+            admin = User.objects.create_superuser(
+                username='admin', email='admin@autodis.mx',
+                password='Admin2026!',
+                first_name='Admin', last_name='Sistema',
+                role=User.DIRECCION_GENERAL,
+            )
+            self.stdout.write(self.style.SUCCESS(
+                f'  + Superusuario: admin@autodis.mx (password: Admin2026!)'
+            ))
+
+    def _create_demo_budgets(self):
+        """Crea presupuestos de ejemplo para el mes actual y siguiente."""
+        self.stdout.write('\nCreando presupuestos demo...')
+        now = timezone.now()
+        months = [(now.year, now.month)]
+        if now.month < 12:
+            months.append((now.year, now.month + 1))
+        else:
+            months.append((now.year + 1, 1))
+
+        cost_centers = CostCenter.objects.all()
+        categories = Category.objects.all()
+
+        # Montos base por categoría (mensuales)
+        base_amounts = {
+            Category.PAPELERIA: Decimal('15000'),
+            Category.LIMPIEZA: Decimal('8000'),
+            Category.MANTENIMIENTO_MOTOS: Decimal('25000'),
+            Category.MANTENIMIENTO_AUTOMOVILES: Decimal('12000'),
+            Category.MANTENIMIENTO_BODEGAS: Decimal('10000'),
+            Category.VIATICOS: Decimal('20000'),
+            Category.SEGURIDAD_HIGIENE: Decimal('7000'),
+            Category.PUBLICIDAD_EVENTOS: Decimal('15000'),
+            Category.CONSUMIBLES: Decimal('5000'),
+            Category.COMBUSTIBLES: Decimal('18000'),
+            Category.NOMINA: Decimal('80000'),
+            Category.IMPUESTOS: Decimal('30000'),
+        }
+
+        created_count = 0
+        for year, month in months:
+            for cc in cost_centers:
+                for cat in categories:
+                    amount = base_amounts.get(cat.code, Decimal('10000'))
+                    _, created = Budget.objects.get_or_create(
+                        cost_center=cc, category=cat, year=year, month=month,
+                        defaults={'amount': amount},
+                    )
+                    if created:
+                        created_count += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f'  + {created_count} presupuestos creados para {len(months)} mes(es) x '
+            f'{cost_centers.count()} centros de costos x {categories.count()} categorias'
         ))
