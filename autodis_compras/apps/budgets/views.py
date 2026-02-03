@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.db.models import Avg
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -75,7 +76,7 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         budget = self.get_object()
         if budget.is_closed:
-            raise permissions.PermissionDenied('No se puede modificar un mes cerrado.')
+            raise PermissionDenied('No se puede modificar un mes cerrado.')
         old_amount = budget.amount
         instance = serializer.save()
         new_amount = instance.amount
