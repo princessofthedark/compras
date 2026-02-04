@@ -4,11 +4,11 @@ import {
   TableRow, Paper, Chip, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, IconButton, Tooltip, CircularProgress,
   TablePagination, Alert, List, ListItem, ListItemIcon, ListItemText,
-  ListItemSecondaryAction, LinearProgress,
+  ListItemSecondaryAction, LinearProgress, Grid, InputAdornment,
 } from '@mui/material';
 import {
   Add, Visibility, Check, Close, Cancel, AttachFile, Delete,
-  PictureAsPdf, CloudUpload,
+  PictureAsPdf, CloudUpload, Search, FilterList,
 } from '@mui/icons-material';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +29,8 @@ const STATUS_LABELS = {
   COMPLETADA: 'Completada', CANCELADA: 'Cancelada',
 };
 
+const ALL_STATUSES = Object.keys(STATUS_LABELS);
+
 export default function Solicitudes() {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
@@ -44,20 +46,40 @@ export default function Solicitudes() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef(null);
+
+  // Filters
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterUrgency, setFilterUrgency] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
+
   const [form, setForm] = useState({
     category: '', items: [], description: '', estimated_amount: '',
     required_date: '', justification: '', urgency: 'NORMAL',
   });
 
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(searchText), 400);
+    return () => clearTimeout(t);
+  }, [searchText]);
+
   const fetchRequests = useCallback(() => {
     setLoading(true);
-    api.get('/requests/purchase-requests/', { params: { page: page + 1 } })
+    const params = { page: page + 1 };
+    if (filterStatus) params.status = filterStatus;
+    if (filterUrgency) params.urgency = filterUrgency;
+    if (searchDebounced) params.search = searchDebounced;
+    api.get('/requests/purchase-requests/', { params })
       .then(({ data }) => { setRequests(data.results); setCount(data.count); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, filterStatus, filterUrgency, searchDebounced]);
 
   useEffect(() => { fetchRequests(); }, [fetchRequests]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [filterStatus, filterUrgency, searchDebounced]);
 
   useEffect(() => {
     api.get('/budgets/categories/').then(({ data }) => setCategories(data.results || []));
@@ -151,12 +173,56 @@ export default function Solicitudes() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 600 }}>Solicitudes de Compra</Typography>
         <Button variant="contained" startIcon={<Add />} onClick={() => setOpenNew(true)}>
           Nueva Solicitud
         </Button>
       </Box>
+
+      {/* Filter Bar */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={4}>
+            <TextField
+              fullWidth size="small" placeholder="Buscar por numero, descripcion..."
+              value={searchText} onChange={(e) => setSearchText(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
+              }}
+            />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <TextField select fullWidth size="small" label="Estado" value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}>
+              <MenuItem value="">Todos</MenuItem>
+              {ALL_STATUSES.map(s => (
+                <MenuItem key={s} value={s}>{STATUS_LABELS[s]}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={6} sm={2}>
+            <TextField select fullWidth size="small" label="Urgencia" value={filterUrgency}
+              onChange={(e) => setFilterUrgency(e.target.value)}>
+              <MenuItem value="">Todas</MenuItem>
+              <MenuItem value="NORMAL">Normal</MenuItem>
+              <MenuItem value="URGENTE">Urgente</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            {(filterStatus || filterUrgency || searchText) && (
+              <Button size="small" startIcon={<FilterList />} onClick={() => {
+                setFilterStatus(''); setFilterUrgency(''); setSearchText('');
+              }}>
+                Limpiar filtros
+              </Button>
+            )}
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              {count} resultado{count !== 1 ? 's' : ''}
+            </Typography>
+          </Grid>
+        </Grid>
+      </Paper>
 
       <TableContainer component={Paper}>
         <Table>
@@ -166,17 +232,19 @@ export default function Solicitudes() {
               <TableCell>Descripcion</TableCell>
               <TableCell>Monto</TableCell>
               <TableCell>Estado</TableCell>
+              <TableCell>Urgencia</TableCell>
               <TableCell>Fecha</TableCell>
               <TableCell>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center"><CircularProgress /></TableCell></TableRow>
             ) : requests.length === 0 ? (
-              <TableRow><TableCell colSpan={6} align="center">No hay solicitudes</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center">No hay solicitudes</TableCell></TableRow>
             ) : requests.map((r) => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} hover sx={{ cursor: 'pointer' }}
+                onClick={() => viewDetail(r.id)}>
                 <TableCell sx={{ fontWeight: 600 }}>{r.request_number}</TableCell>
                 <TableCell>{r.description?.substring(0, 50)}</TableCell>
                 <TableCell>${Number(r.estimated_amount).toLocaleString()}</TableCell>
@@ -184,8 +252,13 @@ export default function Solicitudes() {
                   <Chip label={STATUS_LABELS[r.status] || r.status}
                     color={STATUS_COLORS[r.status] || 'default'} size="small" />
                 </TableCell>
-                <TableCell>{new Date(r.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
+                  <Chip label={r.urgency === 'URGENTE' ? 'Urgente' : 'Normal'}
+                    color={r.urgency === 'URGENTE' ? 'error' : 'default'} size="small"
+                    variant={r.urgency === 'URGENTE' ? 'filled' : 'outlined'} />
+                </TableCell>
+                <TableCell>{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <Tooltip title="Ver detalle">
                     <IconButton size="small" onClick={() => viewDetail(r.id)}><Visibility /></IconButton>
                   </Tooltip>
@@ -276,7 +349,7 @@ export default function Solicitudes() {
               <Typography><strong>Categoria:</strong> {selected.category_name}</Typography>
               <Typography><strong>Monto Estimado:</strong> ${Number(selected.estimated_amount).toLocaleString()}</Typography>
               <Typography><strong>Fecha Requerida:</strong> {selected.required_date}</Typography>
-              <Typography><strong>Urgencia:</strong> {selected.urgency_display}</Typography>
+              <Typography><strong>Urgencia:</strong> {selected.urgency === 'URGENTE' ? 'Urgente' : 'Normal'}</Typography>
               <Typography sx={{ mt: 1 }}><strong>Descripcion:</strong> {selected.description}</Typography>
               <Typography><strong>Justificacion:</strong> {selected.justification}</Typography>
               {selected.exceeds_budget && (
@@ -338,7 +411,6 @@ export default function Solicitudes() {
                   <Typography variant="body2" color="text.secondary">No hay archivos adjuntos</Typography>
                 )}
 
-                {/* Upload button - visible if less than 10 attachments */}
                 {(selected.attachments?.length || 0) < 10 && (
                   <Box sx={{ mt: 1 }}>
                     {uploadError && <Alert severity="error" sx={{ mb: 1 }}>{uploadError}</Alert>}
