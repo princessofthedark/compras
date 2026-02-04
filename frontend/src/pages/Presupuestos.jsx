@@ -3,32 +3,41 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, Button, TextField, MenuItem, Chip, CircularProgress,
   LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions, Alert,
-  Grid,
+  Grid, Card, CardContent,
 } from '@mui/material';
-import { Lock, LockOpen } from '@mui/icons-material';
+import { Lock, LockOpen, AccountBalance, Warning, TrendingUp } from '@mui/icons-material';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Presupuestos() {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [loading, setLoading] = useState(true);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [filterCC, setFilterCC] = useState('');
   const [openCopy, setOpenCopy] = useState(false);
   const [copyForm, setCopyForm] = useState({ target_year: now.getFullYear(), target_month: '' });
   const [message, setMessage] = useState('');
 
   const canManage = user?.role === 'FINANZAS' || user?.role === 'DIRECCION_GENERAL';
 
+  useEffect(() => {
+    api.get('/users/cost-centers/', { params: { page_size: 100 } })
+      .then(({ data }) => setCostCenters(data.results || []));
+  }, []);
+
   const fetchBudgets = useCallback(() => {
     setLoading(true);
-    api.get('/budgets/budgets/', { params: { year, month } })
+    const params = { year, month };
+    if (filterCC) params.cost_center = filterCC;
+    api.get('/budgets/budgets/', { params })
       .then(({ data }) => setBudgets(data.results || []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [year, month]);
+  }, [year, month, filterCC]);
 
   useEffect(() => { fetchBudgets(); }, [fetchBudgets]);
 
@@ -75,15 +84,68 @@ export default function Presupuestos() {
   const anyOpen = budgets.some(b => !b.is_closed);
   const anyClosed = budgets.some(b => b.is_closed);
 
+  // Summary calculations
+  const totalBudgeted = budgets.reduce((s, b) => s + Number(b.amount || 0), 0);
+  const totalSpent = budgets.reduce((s, b) => s + Number(b.spent_amount || 0), 0);
+  const totalAvailable = totalBudgeted - totalSpent;
+  const exceededCount = budgets.filter(b => b.is_exceeded).length;
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>Presupuestos</Typography>
 
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage('')}>{message}</Alert>}
 
+      {/* Summary Cards */}
+      {!loading && budgets.length > 0 && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={6} md={3}>
+            <Card>
+              <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">Presupuestado</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  ${totalBudgeted.toLocaleString()}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card>
+              <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">Gastado</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'warning.main' }}>
+                  ${totalSpent.toLocaleString()}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card>
+              <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">Disponible</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: totalAvailable < 0 ? 'error.main' : 'success.main' }}>
+                  ${totalAvailable.toLocaleString()}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card>
+              <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">Excedidos</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: exceededCount > 0 ? 'error.main' : 'text.primary' }}>
+                  {exceededCount} / {budgets.length}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Filters */}
       <Grid container spacing={2} sx={{ mb: 3 }} alignItems="center">
         <Grid item>
-          <TextField select label="Año" value={year} onChange={(e) => setYear(e.target.value)}
+          <TextField select label="Anio" value={year} onChange={(e) => setYear(e.target.value)}
             size="small" sx={{ width: 120 }}>
             {[2024, 2025, 2026, 2027].map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
           </TextField>
@@ -92,6 +154,16 @@ export default function Presupuestos() {
           <TextField select label="Mes" value={month} onChange={(e) => setMonth(e.target.value)}
             size="small" sx={{ width: 150 }}>
             {months.map(m => <MenuItem key={m.v} value={m.v}>{m.l}</MenuItem>)}
+          </TextField>
+        </Grid>
+        <Grid item>
+          <TextField select label="Centro de Costos" value={filterCC}
+            onChange={(e) => setFilterCC(e.target.value)}
+            size="small" sx={{ width: 200 }}>
+            <MenuItem value="">Todos</MenuItem>
+            {costCenters.map(cc => (
+              <MenuItem key={cc.id} value={cc.id}>{cc.code} - {cc.name}</MenuItem>
+            ))}
           </TextField>
         </Grid>
         {canManage && (
@@ -122,11 +194,11 @@ export default function Presupuestos() {
           <TableHead>
             <TableRow>
               <TableCell>Centro de Costos</TableCell>
-              <TableCell>Categoría</TableCell>
+              <TableCell>Categoria</TableCell>
               <TableCell align="right">Presupuesto</TableCell>
               <TableCell align="right">Gastado</TableCell>
               <TableCell align="right">Disponible</TableCell>
-              <TableCell>Utilización</TableCell>
+              <TableCell>Utilizacion</TableCell>
               <TableCell>Estado</TableCell>
             </TableRow>
           </TableHead>
@@ -139,7 +211,7 @@ export default function Presupuestos() {
               const pct = b.utilization_percentage || 0;
               const color = pct > 100 ? 'error' : pct > 80 ? 'warning' : 'success';
               return (
-                <TableRow key={b.id}>
+                <TableRow key={b.id} hover>
                   <TableCell>{b.cost_center_name}</TableCell>
                   <TableCell>{b.category_name}</TableCell>
                   <TableCell align="right">${Number(b.amount).toLocaleString()}</TableCell>
@@ -177,7 +249,7 @@ export default function Presupuestos() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Copiar presupuestos de {months.find(m => m.v === month)?.l} {year} a:
           </Typography>
-          <TextField select fullWidth label="Año destino" margin="normal" value={copyForm.target_year}
+          <TextField select fullWidth label="Anio destino" margin="normal" value={copyForm.target_year}
             onChange={(e) => setCopyForm({ ...copyForm, target_year: e.target.value })}>
             {[2024, 2025, 2026, 2027].map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
           </TextField>

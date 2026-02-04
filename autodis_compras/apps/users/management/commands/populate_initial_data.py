@@ -514,11 +514,16 @@ class Command(BaseCommand):
 
         # Crear superusuario admin
         if not User.objects.filter(email='admin@autodis.mx').exists():
+            admin_area = Area.objects.get(name=Area.FINANZAS)
+            admin_location = Location.objects.get(name=Location.OFICINAS_CENTRALES)
+            admin_cc = CostCenter.objects.get(code='DIRECCION-GENERAL')
             admin = User.objects.create_superuser(
                 username='admin', email='admin@autodis.mx',
                 password='Admin2026!',
                 first_name='Admin', last_name='Sistema',
                 role=User.DIRECCION_GENERAL,
+                area=admin_area, location=admin_location,
+                cost_center=admin_cc,
             )
             self.stdout.write(self.style.SUCCESS(
                 f'  + Superusuario: admin@autodis.mx (password: Admin2026!)'
