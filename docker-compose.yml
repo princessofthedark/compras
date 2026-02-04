@@ -1,0 +1,89 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: autodis_compras
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-autodis2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    env_file: .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=autodis_compras.settings.production
+      - DB_HOST=db
+      - DB_NAME=autodis_compras
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD:-autodis2026}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py populate_initial_data &&
+             gunicorn autodis_compras.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+
+  celery:
+    build: .
+    env_file: .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=autodis_compras.settings.production
+      - DB_HOST=db
+      - DB_NAME=autodis_compras
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD:-autodis2026}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A autodis_compras worker -l info
+
+  celery-beat:
+    build: .
+    env_file: .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=autodis_compras.settings.production
+      - DB_HOST=db
+      - DB_NAME=autodis_compras
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD:-autodis2026}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A autodis_compras beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  media_data:
