@@ -3,13 +3,14 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Divider, Avatar, Menu,
-  MenuItem, Chip,
+  MenuItem, Chip, Switch, FormControlLabel,
 } from '@mui/material';
 import {
   Menu as MenuIcon, Dashboard, ShoppingCart, AccountBalance,
-  Assessment, People, Logout, Person,
+  Assessment, People, Logout, Person, Lock, EventBusy,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/client';
 
 const DRAWER_WIDTH = 260;
 
@@ -17,7 +18,7 @@ const ROLE_LABELS = {
   EMPLEADO: 'Empleado',
   GERENTE: 'Gerente',
   FINANZAS: 'Finanzas',
-  DIRECCION_GENERAL: 'Dirección General',
+  DIRECCION_GENERAL: 'Direccion General',
 };
 
 const ROLE_COLORS = {
@@ -28,11 +29,24 @@ const ROLE_COLORS = {
 };
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, fetchUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [oooLoading, setOooLoading] = useState(false);
+
+  const handleToggleOOO = async () => {
+    setOooLoading(true);
+    try {
+      await api.post('/users/users/toggle_out_of_office/');
+      await fetchUser();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al cambiar estado');
+    } finally {
+      setOooLoading(false);
+    }
+  };
 
   const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/' },
@@ -80,6 +94,9 @@ export default function Layout() {
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
             Sistema de Compras
           </Typography>
+          {user?.is_out_of_office && (
+            <Chip icon={<EventBusy />} label="Fuera de Oficina" color="warning" size="small" sx={{ mr: 1 }} />
+          )}
           <Chip label={ROLE_LABELS[user?.role] || user?.role}
             color={ROLE_COLORS[user?.role] || 'default'} size="small" sx={{ mr: 2 }} />
           <IconButton color="inherit" onClick={(e) => setAnchorEl(e.currentTarget)}>
@@ -96,8 +113,19 @@ export default function Layout() {
               <Typography variant="caption">{user?.email}</Typography>
             </MenuItem>
             <Divider />
+            <MenuItem onClick={handleToggleOOO} disabled={oooLoading}>
+              <FormControlLabel
+                control={<Switch checked={user?.is_out_of_office || false} size="small" />}
+                label={<Typography variant="body2">Fuera de Oficina</Typography>}
+                sx={{ m: 0 }}
+              />
+            </MenuItem>
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/perfil'); }}>
+              <Lock sx={{ mr: 1 }} /> Cambiar contrasena
+            </MenuItem>
+            <Divider />
             <MenuItem onClick={() => { logout(); navigate('/login'); }}>
-              <Logout sx={{ mr: 1 }} /> Cerrar sesión
+              <Logout sx={{ mr: 1 }} /> Cerrar sesion
             </MenuItem>
           </Menu>
         </Toolbar>

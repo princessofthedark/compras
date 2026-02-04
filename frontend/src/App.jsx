@@ -9,6 +9,7 @@ import Solicitudes from './pages/Solicitudes';
 import Presupuestos from './pages/Presupuestos';
 import Reportes from './pages/Reportes';
 import Usuarios from './pages/Usuarios';
+import Perfil from './pages/Perfil';
 
 const theme = createTheme({
   palette: {
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="presupuestos" element={<Presupuestos />} />
         <Route path="reportes" element={<Reportes />} />
         <Route path="usuarios" element={<Usuarios />} />
+        <Route path="perfil" element={<Perfil />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

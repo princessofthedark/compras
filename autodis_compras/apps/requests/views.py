@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -276,9 +277,18 @@ class RequestAttachmentViewSet(viewsets.ModelViewSet):
     queryset = RequestAttachment.objects.select_related('uploaded_by').all()
     serializer_class = RequestAttachmentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['request']
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def perform_create(self, serializer):
+        file_obj = self.request.FILES.get('file')
+        if file_obj and file_obj.size > 10 * 1024 * 1024:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'file': 'El archivo no puede ser mayor a 10MB.'})
+        purchase_request = serializer.validated_data.get('request')
+        if purchase_request and purchase_request.attachments.count() >= 10:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'file': 'No se pueden adjuntar más de 10 archivos por solicitud.'})
         serializer.save(uploaded_by=self.request.user)
